@@ -1,12 +1,13 @@
 package project.models;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
-import java.util.Date;
 
 @Data
+@NoArgsConstructor
 @Entity
 @Table(name = "post_comments")
 public class PostComment {
@@ -29,4 +30,12 @@ public class PostComment {
 
     @Column(nullable = false)
     private String text;
+
+    public PostComment(Integer parentId, Integer postId, Integer userId, LocalDateTime time, String text) {
+        this.parentId = parentId;
+        this.postId = postId;
+        this.userId = userId;
+        this.time = time;
+        this.text = text;
+    }
 }

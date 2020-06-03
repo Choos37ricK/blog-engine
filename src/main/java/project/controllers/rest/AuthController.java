@@ -5,8 +5,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
-import project.controllers.exceptions.BadRequest;
-import project.controllers.exceptions.NotFoundException;
 import project.dto.*;
 import project.models.User;
 import project.services.AuthService;

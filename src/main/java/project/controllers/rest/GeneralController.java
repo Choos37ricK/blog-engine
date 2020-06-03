@@ -5,15 +5,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
+import project.controllers.exceptions.BadRequestException;
 import project.controllers.exceptions.UnauthorizedException;
 import project.dto.*;
 import project.models.*;
 import project.models.enums.ModerationStatusesEnum;
 import project.services.*;
 
-import java.sql.ResultSet;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +31,8 @@ public class GeneralController {
     private final PostService postService;
 
     private final Post2TagService post2TagService;
+
+    private final PostCommentService postCommentService;
 
     @GetMapping("init")
     public ResponseEntity<InitInfoDto> initInfo() {
@@ -100,6 +100,51 @@ public class GeneralController {
 //        }
 
         return ResponseEntity.ok(postService.getCalendarDto(year));
+    }
+
+    @PostMapping("comment")
+    public ResponseEntity<?> addComment(@RequestBody AddCommentDto addCommentDto) {
+        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
+        if (!authService.checkAuthorization(sessionId)) {
+            throw new UnauthorizedException();
+        }
+
+        return checkOnErrors(addCommentDto);
+    }
+
+    private ResponseEntity<?> checkOnErrors(AddCommentDto addCommentDto) {
+        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
+        if (!authService.checkAuthorization(sessionId)) {
+            throw new UnauthorizedException();
+        }
+
+        Integer parentId = addCommentDto.getParentId();
+        Integer postId = addCommentDto.getPostId();
+        String text = addCommentDto.getText();
+
+        if(parentId != null && postCommentService.findById(parentId) == null
+                || postId == null || postService.findPostById(postId) == null
+        ) {
+            throw new BadRequestException();
+        }
+
+        HashMap<String, String> errors = new HashMap<>();
+
+        if (text.isEmpty()) {
+            errors.put("text", "Текст комментария не задан");
+        } else if (text.length() < 10) {
+            errors.put("text", "Текст комментария слишком короткий");
+        }
+
+        if (errors.size() > 0) {
+            return ResponseEntity.badRequest().body(new PostPublishErrorsDto(false, errors));
+        }
+
+        return ResponseEntity.ok(
+                new AddedCommentIdDto(
+                        postCommentService.saveComment(addCommentDto, authService.getUserIdBySession(sessionId))
+                )
+        );
     }
 
     private TagDto getTagDto(Tag tag) {
