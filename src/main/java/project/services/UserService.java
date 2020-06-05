@@ -18,4 +18,13 @@ public class UserService {
     public User findUserById(Integer id) {
         return usersRepo.findById(id).orElse(null);
     }
+
+    public void updatePhoto(User user, String url) {
+        user.setPhoto(url);
+        usersRepo.save(user);
+    }
+
+    public void saveUser(User user) {
+        usersRepo.save(user);
+    }
 }

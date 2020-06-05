@@ -8,7 +8,7 @@ import java.util.Map;
 
 @Data
 @AllArgsConstructor
-public class PostPublishErrorsDto {
+public class ErrorsDto {
 
     private Boolean result;
 

@@ -5,13 +5,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.multipart.MultipartFile;
 import project.controllers.exceptions.BadRequestException;
+import project.controllers.exceptions.NotFoundException;
 import project.controllers.exceptions.UnauthorizedException;
 import project.dto.*;
 import project.models.*;
 import project.models.enums.ModerationStatusesEnum;
 import project.services.*;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,6 +37,10 @@ public class GeneralController {
 
     private final PostCommentService postCommentService;
 
+    private final GeneralService generalService;
+
+    private final ImagePath imagePath;
+
     @GetMapping("init")
     public ResponseEntity<InitInfoDto> initInfo() {
         InitInfoDto dto = new InitInfoDto(
@@ -55,6 +62,17 @@ public class GeneralController {
                 .map(this::getTagDto)
                 .sorted(Comparator.comparing(TagDto::getWeight).reversed())
                 .collect(Collectors.toList());
+
+        Float biggestWeight = tagDtoList.get(0).getWeight();
+        tagDtoList.get(0).setWeight(1f);
+
+        tagDtoList.forEach(tagDto -> {
+            Float tagWeight = tagDto.getWeight();
+            if (tagWeight < 0.5) {
+                tagWeight *= (1/biggestWeight);
+                tagDto.setWeight(tagWeight);
+            }
+        });
 
         return ResponseEntity.ok(new TagListDto(tagDtoList));
     }
@@ -112,6 +130,41 @@ public class GeneralController {
         return checkOnErrors(addCommentDto);
     }
 
+    @PostMapping("profile/my")
+    public ResponseEntity<?> myProfile(@RequestBody MyProfileDto myProfileDto) {
+        return null;
+    }
+
+    @PostMapping("image")
+    public ResponseEntity<?> upload(@RequestPart("file") MultipartFile multipartFile) throws IOException {
+        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
+        if (!authService.checkAuthorization(sessionId)) {
+            throw new UnauthorizedException();
+        }
+
+        if (multipartFile.isEmpty())
+            throw new BadRequestException();
+
+        User user = userService.findUserById(authService.getUserIdBySession(sessionId));
+
+        String photo = user.getPhoto();
+        if (photo.equals(imagePath.getDefaultImagePath())) {
+            Integer id = generalService.saveImage(multipartFile.getBytes(), multipartFile.getContentType());
+            String URL = imagePath.getImagePath()  + id;
+            userService.updatePhoto(user, URL);
+            return ResponseEntity.ok(URL);
+        } else {
+            Integer oldId = Integer.valueOf(photo.replace(imagePath.getImagePath(), ""));
+
+            try {
+                generalService.updateImage(multipartFile.getBytes(), multipartFile.getContentType(), oldId);
+                return ResponseEntity.ok(imagePath.getImagePath()  + oldId);
+            } catch(NotFoundException e) {
+                throw new BadRequestException();
+            }
+        }
+    }
+
     private ResponseEntity<?> checkOnErrors(AddCommentDto addCommentDto) {
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         if (!authService.checkAuthorization(sessionId)) {
@@ -137,7 +190,7 @@ public class GeneralController {
         }
 
         if (errors.size() > 0) {
-            return ResponseEntity.badRequest().body(new PostPublishErrorsDto(false, errors));
+            return ResponseEntity.badRequest().body(new ErrorsDto(false, errors));
         }
 
         return ResponseEntity.ok(
@@ -152,9 +205,6 @@ public class GeneralController {
         Integer postTotalCount = postService.countPosts();
         Float weight = (float)postWithTagCount / postTotalCount;
 
-        if (weight < 0.33){
-            weight += 0.33f;
-        }
         return new TagDto(tag.getName(), weight);
     }
 

@@ -16,7 +16,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
@@ -45,6 +44,9 @@ public class PostController {
 
     @Value("${text.min.length}")
     private Integer textMinLength;
+
+    @Value("${announce.length}")
+    private Integer announceLength;
 
     @GetMapping
     public ResponseEntity<?> getPosts(
@@ -211,7 +213,7 @@ public class PostController {
         }
 
         if (errors.size() > 0) {
-            return ResponseEntity.badRequest().body(new PostPublishErrorsDto(false, errors));
+            return ResponseEntity.badRequest().body(new ErrorsDto(false, errors));
         }
 
         return savePostAndTags(sessionId, postPublishDto, postId, type);
@@ -247,7 +249,7 @@ public class PostController {
                 post.getTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy hh:mm")),
                 authorDto,
                 post.getTitle(),
-                post.getText().substring(0, 10),
+                post.getText().substring(0, announceLength),
                 likeCount,
                 dislikeCount,
                 commentCount,

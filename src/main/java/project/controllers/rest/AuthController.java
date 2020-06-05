@@ -1,20 +1,29 @@
 package project.controllers.rest;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
 import project.dto.*;
+import project.models.CaptchaCode;
+import project.models.ImagePath;
 import project.models.User;
 import project.services.AuthService;
+import project.services.CaptchaCodeService;
 import project.services.PostService;
 import project.services.UserService;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 
 @RestController
 @RequestMapping("/api/auth/")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class AuthController {
 
     private final UserService userService;
@@ -23,7 +32,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    private final CaptchaCodeService captchaCodeService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+    @Value("${name.max.length}")
+    private Integer nameMaxLength;
 
     @PostMapping("login")
     public ResponseEntity<?> login(@RequestBody LoginDto loginDto) {
@@ -52,6 +66,60 @@ public class AuthController {
     public ResponseEntity<ResultTrueFalseDto> logout() {
 
         authService.logout();
+
+        return ResponseEntity.ok(new ResultTrueFalseDto(true));
+    }
+
+    @PostMapping("register")
+    public ResponseEntity<?> register(@RequestBody RegisterDto registerDto) {
+        return checkOnErrors(registerDto);
+    }
+
+    @GetMapping("captcha")
+    public ResponseEntity<?> getCaptcha() {
+        return ResponseEntity.ok(captchaCodeService.getCaptchaDto());
+    }
+
+    private ResponseEntity<?> checkOnErrors(RegisterDto registerDto) {
+        Map<String, String> errors = new HashMap<>();
+
+        User existUser = userService.findUserByEmail(registerDto.getEmail());
+        if (existUser != null) {
+            errors.put("email", "Этот e-mail уже зарегистрирован");
+        }
+
+        if (!registerDto.getName().matches("^[A-Za-zА-Яа-яЁё]{1," + nameMaxLength + "}$")) {
+            errors.put("name", "Имя указано неверно или имеет недопустимую длину (1-30)");
+        }
+
+        if (registerDto.getPassword().length() < 6) {
+            errors.put("password", "Пароль короче 6-ти символов");
+        }
+
+        CaptchaCode captcha = captchaCodeService.findCaptchaByCode(registerDto.getCaptcha());
+        if (captcha == null) {
+            errors.put("captcha", "Код с картинки введён неверно");
+        }
+
+        if (errors.size() > 0) {
+            return ResponseEntity.badRequest().body(new ErrorsDto(false, errors));
+        }
+
+        User newUser = new User(
+                (byte) 0,
+                LocalDateTime.now(),
+                registerDto.getName(),
+                registerDto.getEmail(),
+                passwordEncoder.encode(registerDto.getPassword()),
+                null,
+                "http://localhost:8086/src/main/resources/uploads/default-1.png"
+        );
+        userService.saveUser(newUser);
+
+        /**
+         * Добавлено удаление каптчи после использования
+         */
+        captchaCodeService.deleteCaptcha(captcha);
 
         return ResponseEntity.ok(new ResultTrueFalseDto(true));
     }

@@ -1,9 +1,19 @@
 package project.services;
 
 import lombok.AllArgsConstructor;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
+import project.dto.CaptchaDto;
+import project.models.CaptchaCode;
+import project.repositories.CaptchaCodesRepo;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.Map;
 
 @Service
@@ -31,5 +41,6 @@ public class AuthService {
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         authorizedUsers.remove(sessionId);
     }
+
 
 }

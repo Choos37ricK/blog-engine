@@ -1,11 +1,14 @@
 package project.models;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 @Data
+@NoArgsConstructor
 @Entity
 @Table(name = "users")
 public class User {
@@ -18,7 +21,7 @@ public class User {
     private Byte isModerator;
 
     @Column(name = "reg_time", nullable = false)
-    private Date regTime;
+    private LocalDateTime regTime;
 
     @Column(nullable = false)
     private String name;
@@ -32,4 +35,14 @@ public class User {
     private String code;
 
     private String photo;
+
+    public User(Byte isModerator, LocalDateTime regTime, String name, String email, String password, String code, String photo) {
+        this.isModerator = isModerator;
+        this.regTime = regTime;
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.code = code;
+        this.photo = photo;
+    }
 }
