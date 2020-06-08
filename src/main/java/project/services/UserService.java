@@ -19,6 +19,10 @@ public class UserService {
         return usersRepo.findById(id).orElse(null);
     }
 
+    public User findUserByRecoverCode(String code) {
+        return usersRepo.findByCode(code).orElse(null);
+    }
+
     public void updatePhoto(User user, String url) {
         user.setPhoto(url);
         usersRepo.save(user);

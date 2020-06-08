@@ -12,7 +12,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -21,8 +20,8 @@ public class CaptchaCodeService {
 
     private final CaptchaCodesRepo captchaCodesRepo;
 
-    public CaptchaCode findCaptchaByCode(String code) {
-        return captchaCodesRepo.findByCode(code).orElse(null);
+    public CaptchaCode findCaptchaByCodeAndSecretCode(String code, String secretCode) {
+        return captchaCodesRepo.findByCodeAndSecretCode(code, secretCode).orElse(null);
     }
 
     public void deleteCaptcha(CaptchaCode captchaCode) {

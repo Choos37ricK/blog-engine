@@ -1,6 +1,7 @@
 package project.controllers.rest;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -8,14 +9,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
 import project.dto.*;
 import project.models.CaptchaCode;
-import project.models.ImagePath;
 import project.models.User;
-import project.services.AuthService;
-import project.services.CaptchaCodeService;
-import project.services.PostService;
-import project.services.UserService;
+import project.services.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,6 +29,8 @@ public class AuthController {
     private final AuthService authService;
 
     private final CaptchaCodeService captchaCodeService;
+
+    private final EmailService emailService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -80,6 +78,67 @@ public class AuthController {
         return ResponseEntity.ok(captchaCodeService.getCaptchaDto());
     }
 
+    @PostMapping("restore")
+    public ResponseEntity<?> restore(@RequestBody RestoreDto restoreDto) {
+        return recoverPassword(restoreDto.getEmail());
+    }
+
+    @PostMapping("password")
+    public ResponseEntity<?> password(@RequestBody PasswordRestoreDto passwordRestoreDto) {
+        User existUser = userService.findUserByRecoverCode(passwordRestoreDto.getCode());
+
+        Map<String, String> errors = new HashMap<>();
+
+        if (existUser == null) {
+            errors.put("code", "Ссылка для восстановления пароля устарела.\n" +
+                    "<a href=/login/restore-password>Запросить ссылку снова</a>");
+        }
+
+        if (passwordRestoreDto.getPassword().length() < 6) {
+            errors.put("password", "Пароль короче 6-ти символов");
+        }
+
+        CaptchaCode captcha = captchaCodeService.findCaptchaByCodeAndSecretCode(
+                passwordRestoreDto.getCaptcha(), passwordRestoreDto.getCaptchaSecret());
+        if (captcha == null) {
+            errors.put("captcha", "Код с картинки введён неверно");
+        }
+
+        if (errors.size() > 0) {
+            return ResponseEntity.ok(new ErrorsDto(false, errors));
+        }
+
+        existUser.setCode("");
+        existUser.setPassword(passwordEncoder.encode(passwordRestoreDto.getPassword()));
+        userService.saveUser(existUser);
+
+        /**
+         * Добавлено удаление каптчи после использования
+         */
+        captchaCodeService.deleteCaptcha(captcha);
+
+        return ResponseEntity.ok(new ResultTrueFalseDto(true));
+    }
+
+    private ResponseEntity<?> recoverPassword(String email) {
+        User user = userService.findUserByEmail(email);
+
+        if (user == null) {
+            return ResponseEntity.badRequest().body(new ResultTrueFalseDto(false));
+        }
+
+        String token = RandomStringUtils.randomAlphanumeric(45).toLowerCase();
+
+        user.setCode(token);
+        userService.saveUser(user);
+
+        String link = "http://localhost:8086/login/change-password/" + token;
+        String message = String.format("Для восстановления пароля перейдите по ссылке %s", link );
+        emailService.send(email, "Восстановление пароля", message);
+
+        return ResponseEntity.ok(new ResultTrueFalseDto(true));
+    }
+
     private ResponseEntity<?> checkOnErrors(RegisterDto registerDto) {
         Map<String, String> errors = new HashMap<>();
 
@@ -96,13 +155,14 @@ public class AuthController {
             errors.put("password", "Пароль короче 6-ти символов");
         }
 
-        CaptchaCode captcha = captchaCodeService.findCaptchaByCode(registerDto.getCaptcha());
+        CaptchaCode captcha = captchaCodeService.findCaptchaByCodeAndSecretCode(
+                registerDto.getCaptcha(), registerDto.getCaptchaSecret());
         if (captcha == null) {
             errors.put("captcha", "Код с картинки введён неверно");
         }
 
         if (errors.size() > 0) {
-            return ResponseEntity.badRequest().body(new ErrorsDto(false, errors));
+            return ResponseEntity.ok(new ErrorsDto(false, errors));
         }
 
         User newUser = new User(

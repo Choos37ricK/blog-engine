@@ -16,5 +16,5 @@ public interface CaptchaCodesRepo extends CrudRepository<CaptchaCode, Integer> {
             "where time_to_sec(timediff(now(), time)) > 3600", nativeQuery = true)
     void deleteOld();
 
-    Optional<CaptchaCode> findByCode(String Code);
+    Optional<CaptchaCode> findByCodeAndSecretCode(String Code, String secretCode);
 }
