@@ -1,15 +1,16 @@
 package project.controllers.rest;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.beans.factory.annotation.Value;
 import project.controllers.exceptions.UnauthorizedException;
 import project.dto.*;
 import project.models.Post;
 import project.models.PostComment;
 import project.models.User;
+import project.models.enums.ModerationStatusesEnum;
 import project.services.*;
 
 import java.time.format.DateTimeFormatter;
@@ -81,14 +82,22 @@ public class PostController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OnePostDto> getPostById(@PathVariable Integer id) {
+    public ResponseEntity<?> getPostById(@PathVariable Integer id) {
         Post post;
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
+        User user = userService.findUserById(authService.getUserIdBySession(sessionId));
         if (authService.checkAuthorization(sessionId)) {
-            Byte isModerator = userService.findUserById(authService.getUserIdBySession(sessionId)).getIsModerator();
+            Byte isModerator = user.getIsModerator();
             post = postService.getPostByIdAndModerationStatus(id, isModerator);
         } else {
             post = postService.getPostByIdAndModerationStatus(id, (byte) 0);
+            if (post != null) {
+                if (!post.getAuthor().getId().equals(user.getId())) {
+                    if (!(post.getIsActive() == (byte) 1 && post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED)) {
+                        return ResponseEntity.badRequest().body(new ResultTrueFalseDto(false));
+                    }
+                }
+            }
         }
 
         return ResponseEntity.ok(getOnePostDto(post));

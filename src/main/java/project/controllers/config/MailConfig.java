@@ -43,8 +43,6 @@ public class MailConfig {
         mailSender.setPassword(password);
 
         Properties props = mailSender.getJavaMailProperties();
-        props.put("mail.transport.protocol", protocol);
-        props.put("mail.debug", debug);
         props.put("mail.smtp.starttls.enable", "true");
 
         return mailSender;

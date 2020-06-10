@@ -5,20 +5,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import project.dto.CalendarDto;
 import project.dto.PostPublishDto;
-import project.dto.YearPublicationsDto;
-import project.models.IYearPublicationCount;
 import project.models.Post;
 import project.models.User;
 import project.models.enums.ModerationStatusesEnum;
 import project.repositories.PostsRepo;
 
-import java.sql.ResultSet;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
 
@@ -132,7 +127,7 @@ public class PostService {
 
         if (isModerator == 0) {
             return postsRepo
-                    .findByIdAndIsActiveAndModerationStatus(postId, (byte) 1, ModerationStatusesEnum.ACCEPTED)
+                    .findById(postId)
                     .orElse(null);
         } else {
             return postsRepo.findByIdAndIsActive(postId, (byte) 1).orElse(null);

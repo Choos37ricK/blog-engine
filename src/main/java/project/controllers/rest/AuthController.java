@@ -133,7 +133,7 @@ public class AuthController {
         userService.saveUser(user);
 
         String link = "http://localhost:8086/login/change-password/" + token;
-        String message = String.format("Для восстановления пароля перейдите по ссылке %s", link );
+        String message = "<a href=\"" + link + "\">Восстановить пароль</a>";
         emailService.send(email, "Восстановление пароля", message);
 
         return ResponseEntity.ok(new ResultTrueFalseDto(true));

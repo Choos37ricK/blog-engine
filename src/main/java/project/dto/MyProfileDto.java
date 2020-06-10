@@ -1,11 +1,15 @@
 package project.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
-@AllArgsConstructor
 public class MyProfileDto {
 
+    private Byte removePhoto;
 
+    private String name;
+
+    private String email;
+
+    private String password;
 }

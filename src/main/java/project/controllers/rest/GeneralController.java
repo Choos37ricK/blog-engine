@@ -1,26 +1,31 @@
 package project.controllers.rest;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.multipart.MultipartFile;
 import project.controllers.exceptions.BadRequestException;
-import project.controllers.exceptions.NotFoundException;
 import project.controllers.exceptions.UnauthorizedException;
 import project.dto.*;
 import project.models.*;
 import project.models.enums.ModerationStatusesEnum;
 import project.services.*;
 
-import java.io.IOException;
-import java.util.*;
+import java.io.File;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class GeneralController {
 
     private final AuthService authService;
@@ -39,7 +44,8 @@ public class GeneralController {
 
     private final GeneralService generalService;
 
-    private final ImagePath imagePath;
+    @Value("${name.max.length}")
+    private Integer nameMaxLength;
 
     @GetMapping("init")
     public ResponseEntity<InitInfoDto> initInfo() {
@@ -127,45 +133,159 @@ public class GeneralController {
             throw new UnauthorizedException();
         }
 
-        return checkOnErrors(addCommentDto);
+        return checkOnErrorsComment(addCommentDto);
     }
 
-    @PostMapping("profile/my")
-    public ResponseEntity<?> myProfile(@RequestBody MyProfileDto myProfileDto) {
-        return null;
-    }
-
-    @PostMapping("image")
-    public ResponseEntity<?> upload(@RequestPart("file") MultipartFile multipartFile) throws IOException {
+    @SneakyThrows
+    @PostMapping(value = "profile/my", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> editProfileWithPhoto(@RequestParam(value = "photo", required = false) MultipartFile photo,
+                                                  @ModelAttribute MyProfileDto myProfileDto) {
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         if (!authService.checkAuthorization(sessionId)) {
             throw new UnauthorizedException();
         }
 
-        if (multipartFile.isEmpty())
-            throw new BadRequestException();
+        User exist = userService.findUserById(authService.getUserIdBySession(sessionId));
 
-        User user = userService.findUserById(authService.getUserIdBySession(sessionId));
-
-        String photo = user.getPhoto();
-        if (photo.equals(imagePath.getDefaultImagePath())) {
-            Integer id = generalService.saveImage(multipartFile.getBytes(), multipartFile.getContentType());
-            String URL = imagePath.getImagePath()  + id;
-            userService.updatePhoto(user, URL);
-            return ResponseEntity.ok(URL);
-        } else {
-            Integer oldId = Integer.valueOf(photo.replace(imagePath.getImagePath(), ""));
-
-            try {
-                generalService.updateImage(multipartFile.getBytes(), multipartFile.getContentType(), oldId);
-                return ResponseEntity.ok(imagePath.getImagePath()  + oldId);
-            } catch(NotFoundException e) {
-                throw new BadRequestException();
-            }
+        ErrorsDto errorsDto = checkOnErrorsProfile(myProfileDto, exist, photo);
+        if (errorsDto.getErrors().size() > 0) {
+            return ResponseEntity.badRequest().body(errorsDto);
         }
+
+        if (photo != null) {
+
+            String type = photo.getContentType().split("/")[1];
+            String randomName = RandomStringUtils.randomAlphanumeric(10);
+            String basePath = "C:/Users/Norty/Desktop/Blog engine";
+            String dir1 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
+            String dir2 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
+            String dir3 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
+            String dstPath = String.format("/src/main/resources/uploads/%s/%s/%s/", dir1, dir2, dir3);
+            File uploadFolder = new File(basePath + dstPath);
+
+            if (!uploadFolder.exists()) {
+                uploadFolder.mkdirs();
+            }
+
+            photo.transferTo(new File(uploadFolder, randomName + "." + type));
+
+            String userPhoto = exist.getPhoto();
+
+            exist.setPhoto(dstPath + randomName + "." + type);
+        }
+
+        exist.setName(myProfileDto.getName());
+        exist.setEmail(myProfileDto.getEmail());
+
+        if (myProfileDto.getPassword() != null) {
+            exist.setPassword(myProfileDto.getPassword());
+        }
+
+        userService.saveUser(exist);
+
+        return ResponseEntity.ok(new ResultTrueFalseDto(true));
     }
 
-    private ResponseEntity<?> checkOnErrors(AddCommentDto addCommentDto) {
+    @SneakyThrows
+    @PostMapping("profile/my")
+    public ResponseEntity<?> editProfile(@RequestBody MyProfileDto myProfileDto) {
+        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
+        if (!authService.checkAuthorization(sessionId)) {
+            throw new UnauthorizedException();
+        }
+
+        User exist = userService.findUserById(authService.getUserIdBySession(sessionId));
+
+        ErrorsDto errorsDto = checkOnErrorsProfile(myProfileDto, exist, null);
+        if (errorsDto.getErrors().size() > 0) {
+            return ResponseEntity.badRequest().body(errorsDto);
+        }
+
+        if (myProfileDto.getRemovePhoto() != null && myProfileDto.getRemovePhoto() == 1) { //разобраться с путями
+            String basePath = "C:/Users/Norty/Desktop/Blog engine";
+            String userPhoto = exist.getPhoto();
+
+            String path = basePath + userPhoto;
+
+            if (userPhoto != null) {
+                new File(userPhoto.replace(
+                        "http://localhost:8086", basePath)
+                ).delete();
+            }
+            exist.setPhoto(null);
+        }
+
+        exist.setName(myProfileDto.getName());
+        exist.setEmail(myProfileDto.getEmail());
+
+        if (myProfileDto.getPassword() != null) {
+            exist.setPassword(myProfileDto.getPassword());
+        }
+
+        userService.saveUser(exist);
+
+        return ResponseEntity.ok(new ResultTrueFalseDto(true));
+    }
+
+    @SneakyThrows
+    @PostMapping("image")
+    public ResponseEntity<?> upload(@RequestPart("image") MultipartFile image) {
+        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
+        if (!authService.checkAuthorization(sessionId)) {
+            throw new UnauthorizedException();
+        }
+
+        if (image.isEmpty()) {
+            throw new BadRequestException();
+        }
+
+        String type = image.getContentType().split("/")[1];
+        String randomName = RandomStringUtils.randomAlphanumeric(10);
+        String dir1 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
+        String dir2 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
+        String dir3 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
+        String basePath = "C:/Users/Norty/Desktop/Blog engine";
+        String dstPath = String.format("/src/main/resources/uploads/%s/%s/%s/", dir1, dir2, dir3);
+        File uploadFolder = new File(basePath + dstPath);
+
+        if (!uploadFolder.exists()) {
+            uploadFolder.mkdirs();
+        }
+        File dstImage = new File(uploadFolder, randomName + "." + type);
+        image.transferTo(dstImage);
+
+        return ResponseEntity.ok(dstPath + randomName + "." + type);
+    }
+
+    private ErrorsDto checkOnErrorsProfile(MyProfileDto myProfileDto, User user, MultipartFile photo) {
+        HashMap<String, String> errors = new HashMap<>();
+
+        String newEmail = myProfileDto.getEmail();
+
+        if (!newEmail.equals(user.getEmail())) {
+            User exist = userService.findUserByEmail(newEmail);
+
+            if (exist != null) {
+                errors.put("email", "Этот e-mail уже зарегистрирован");
+            }
+        }
+
+        if (photo != null && photo.getSize() > 5242880) {
+            errors.put("photo", "Фото слишком большое, нужно не более 5 Мб");
+        }
+
+        if (!myProfileDto.getName().matches("^[A-Za-zА-Яа-яЁё]{1," + nameMaxLength + "}$")) {
+            errors.put("name", "Имя указано неверно или имеет недопустимую длину (1-30)");
+        }
+
+        if (myProfileDto.getPassword() != null && myProfileDto.getPassword().length() < 6) {
+            errors.put("password", "Пароль короче 6-ти символов");
+        }
+
+        return new ErrorsDto(false, errors);
+    }
+
+    private ResponseEntity<?> checkOnErrorsComment(AddCommentDto addCommentDto) {
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         if (!authService.checkAuthorization(sessionId)) {
             throw new UnauthorizedException();
