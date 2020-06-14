@@ -4,19 +4,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
-import project.dto.YearPublicationsDto;
-import project.models.IYearPublicationCount;
 import project.models.Post;
 import project.models.User;
 import project.models.enums.ModerationStatusesEnum;
 
-import java.sql.ResultSet;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 public interface PostsRepo extends CrudRepository<Post, Integer> {
     List<Post> findAllByTimeBeforeAndIsActiveAndModerationStatus(

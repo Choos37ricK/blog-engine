@@ -3,6 +3,7 @@ package project.controllers.rest;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.imgscalr.Scalr;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,6 +18,9 @@ import project.models.*;
 import project.models.enums.ModerationStatusesEnum;
 import project.services.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -166,8 +170,8 @@ public class GeneralController {
             if (!uploadFolder.exists()) {
                 uploadFolder.mkdirs();
             }
-
-            photo.transferTo(new File(uploadFolder, randomName + "." + type));
+            File dstFile = new File(uploadFolder, randomName + "." + type);
+            saveImage(50, photo, dstFile, type);
 
             String userPhoto = exist.getPhoto();
 
@@ -251,10 +255,19 @@ public class GeneralController {
         if (!uploadFolder.exists()) {
             uploadFolder.mkdirs();
         }
-        File dstImage = new File(uploadFolder, randomName + "." + type);
-        image.transferTo(dstImage);
+        File dstFile = new File(uploadFolder, randomName + "." + type);
+        saveImage(400, image, dstFile, type);
 
         return ResponseEntity.ok(dstPath + randomName + "." + type);
+    }
+
+    @SneakyThrows
+    private void saveImage(Integer newWidth, MultipartFile image, File dstFile, String type) {
+        BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(image.getBytes()));
+        int newHeight = (int) Math.round(bufferedImage.getHeight() / (bufferedImage.getWidth() / (double) newWidth));
+        BufferedImage newImage = Scalr.resize(bufferedImage, Scalr.Method.ULTRA_QUALITY, newWidth, newHeight);
+
+        ImageIO.write(newImage, type, dstFile);
     }
 
     private ErrorsDto checkOnErrorsProfile(MyProfileDto myProfileDto, User user, MultipartFile photo) {
