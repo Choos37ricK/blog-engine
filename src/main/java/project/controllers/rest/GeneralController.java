@@ -48,6 +48,9 @@ public class GeneralController {
 
     private final GeneralService generalService;
 
+    @Value("${upload.path}")
+    private String location;
+
     @Value("${name.max.length}")
     private Integer nameMaxLength;
 
@@ -160,12 +163,11 @@ public class GeneralController {
 
             String type = photo.getContentType().split("/")[1];
             String randomName = RandomStringUtils.randomAlphanumeric(10);
-            String basePath = "C:/Users/Norty/Desktop/Blog engine";
             String dir1 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
             String dir2 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
             String dir3 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
-            String dstPath = String.format("/src/main/resources/uploads/%s/%s/%s/", dir1, dir2, dir3);
-            File uploadFolder = new File(basePath + dstPath);
+            String dstPath = String.format("%s%s/%s/%s/", location, dir1, dir2, dir3);
+            File uploadFolder = new File(dstPath);
 
             if (!uploadFolder.exists()) {
                 uploadFolder.mkdirs();
@@ -175,7 +177,7 @@ public class GeneralController {
 
             String userPhoto = exist.getPhoto();
 
-            exist.setPhoto(dstPath + randomName + "." + type);
+            exist.setPhoto(String.format("/%s%s.%s", dstPath, randomName, type));
         }
 
         exist.setName(myProfileDto.getName());
@@ -206,15 +208,10 @@ public class GeneralController {
         }
 
         if (myProfileDto.getRemovePhoto() != null && myProfileDto.getRemovePhoto() == 1) { //разобраться с путями
-            String basePath = "C:/Users/Norty/Desktop/Blog engine";
             String userPhoto = exist.getPhoto();
 
-            String path = basePath + userPhoto;
-
             if (userPhoto != null) {
-                new File(userPhoto.replace(
-                        "http://localhost:8086", basePath)
-                ).delete();
+                new File(userPhoto.replaceFirst("/", "")).delete();
             }
             exist.setPhoto(null);
         }
@@ -239,26 +236,21 @@ public class GeneralController {
             throw new UnauthorizedException();
         }
 
-        if (image.isEmpty()) {
-            throw new BadRequestException();
-        }
-
         String type = image.getContentType().split("/")[1];
         String randomName = RandomStringUtils.randomAlphanumeric(10);
         String dir1 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
         String dir2 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
         String dir3 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
-        String basePath = "C:/Users/Norty/Desktop/Blog engine";
-        String dstPath = String.format("/src/main/resources/uploads/%s/%s/%s/", dir1, dir2, dir3);
-        File uploadFolder = new File(basePath + dstPath);
+        String dstPath = String.format("%s%s/%s/%s/", location, dir1, dir2, dir3);
+        File uploadFolder = new File(dstPath);
 
         if (!uploadFolder.exists()) {
             uploadFolder.mkdirs();
         }
         File dstFile = new File(uploadFolder, randomName + "." + type);
-        saveImage(400, image, dstFile, type);
+        saveImage(200, image, dstFile, type);
 
-        return ResponseEntity.ok(dstPath + randomName + "." + type);
+        return ResponseEntity.ok(String.format("/%s%s.%s", dstPath, randomName, type));
     }
 
     @SneakyThrows
@@ -311,7 +303,7 @@ public class GeneralController {
         if(parentId != null && postCommentService.findById(parentId) == null
                 || postId == null || postService.findPostById(postId) == null
         ) {
-            throw new BadRequestException();
+            throw new BadRequestException("Комментарий или пост, на который вы хотите ответить не существует!");
         }
 
         HashMap<String, String> errors = new HashMap<>();

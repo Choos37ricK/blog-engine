@@ -16,7 +16,7 @@ public class UserService {
     }
 
     public User findUserById(Integer id) {
-        return usersRepo.findById(id).orElse(null);
+        return id == null ? null : usersRepo.findById(id).orElse(null);
     }
 
     public User findUserByRecoverCode(String code) {

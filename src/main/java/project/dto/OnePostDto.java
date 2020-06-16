@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -17,7 +18,7 @@ public class OnePostDto extends PostDto {
 
     private List<String> tags;
 
-    public OnePostDto(Integer id, String time, PostUserDto user, String title, String announce, Integer likeCount,
+    public OnePostDto(Integer id, LocalDateTime time, PostUserDto user, String title, String announce, Integer likeCount,
                       Integer dislikeCount, Integer commentCount, Integer viewCount, String text, List<PostCommentDto> comments,
                       List<String> tags) {
         super(id, time, user, title, announce, likeCount, dislikeCount, commentCount, viewCount);

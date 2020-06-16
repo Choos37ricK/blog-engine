@@ -5,15 +5,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
+import project.controllers.exceptions.BadRequestException;
 import project.controllers.exceptions.UnauthorizedException;
 import project.dto.*;
 import project.models.Post;
 import project.models.PostComment;
 import project.models.User;
-import project.models.enums.ModerationStatusesEnum;
 import project.services.*;
 
-import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -86,18 +85,11 @@ public class PostController {
         Post post;
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         User user = userService.findUserById(authService.getUserIdBySession(sessionId));
-        if (authService.checkAuthorization(sessionId)) {
-            Byte isModerator = user.getIsModerator();
-            post = postService.getPostByIdAndModerationStatus(id, isModerator);
-        } else {
-            post = postService.getPostByIdAndModerationStatus(id, (byte) 0);
-            if (post != null) {
-                if (!post.getAuthor().getId().equals(user.getId())) {
-                    if (!(post.getIsActive() == (byte) 1 && post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED)) {
-                        return ResponseEntity.badRequest().body(new ResultTrueFalseDto(false));
-                    }
-                }
-            }
+
+        post = postService.getPostByIdAndModerationStatus(id, user);
+
+        if (post == null) {
+            throw new BadRequestException("Данный пост вам не доступен");
         }
 
         return ResponseEntity.ok(getOnePostDto(post));
@@ -255,7 +247,7 @@ public class PostController {
 
         return new PostDto(
                 postId,
-                post.getTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy hh:mm")),
+                post.getTime(),
                 authorDto,
                 post.getTitle(),
                 post.getText().substring(0, announceLength),

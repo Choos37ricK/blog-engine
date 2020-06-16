@@ -123,16 +123,32 @@ public class PostService {
         return postList;
     }
 
-    public Post getPostByIdAndModerationStatus(Integer postId, Byte isModerator) {
+    public Post getPostByIdAndModerationStatus(Integer postId, User user) {
 
-        if (isModerator == 0) {
-            return postsRepo
-                    .findById(postId)
-                    .orElse(null);
+        Post post;
+        if (user != null) {
+            if (user.getIsModerator() == 1) {
+                post = postsRepo.findByIdAndIsActive(postId, (byte) 1).orElse(null);
+            }
+            else {
+                post = postsRepo.findById(postId).orElse(null);
+
+                if (post != null) {
+                    if (!(post.getAuthor().equals(user) &&
+                            post.getIsActive() == (byte) 1 &&
+                            post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED
+                    )) {
+                        post = null;
+                    }
+                }
+            }
         } else {
-            return postsRepo.findByIdAndIsActive(postId, (byte) 1).orElse(null);
+            post = postsRepo
+                    .findByIdAndIsActiveAndModerationStatus(postId, (byte) 1, ModerationStatusesEnum.ACCEPTED)
+                    .orElse(null);
         }
 
+        return post;
     }
 
     public List<Post> getPostsByDate(String date) {
