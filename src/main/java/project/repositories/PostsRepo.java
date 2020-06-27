@@ -1,6 +1,6 @@
 package project.repositories;
 
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -17,10 +17,36 @@ public interface PostsRepo extends CrudRepository<Post, Integer> {
             LocalDateTime time,
             Byte isActive,
             ModerationStatusesEnum status,
-            Sort sort
+            Pageable pageable
     );
 
+    @Query("SELECT p FROM Post p " +
+            "JOIN PostComment pc on pc.postId = p.id " +
+            "WHERE p.moderationStatus = :status " +
+            "AND p.isActive = :isActive " +
+            "GROUP BY pc.postId " +
+            "ORDER BY count(p) DESC")
+    List<Post> findAllByModerationStatusAndIsActiveAndCommentsCount(ModerationStatusesEnum status, Byte isActive, Pageable pageable);
+
+    @Query("SELECT p FROM Post p " +
+            "JOIN PostVote pv on pv.postId = p.id " +
+            "WHERE p.moderationStatus = :status " +
+            "AND p.isActive = :isActive " +
+            "AND pv.value = 1 " +
+            "GROUP BY pv.postId " +
+            "ORDER BY count(p) DESC")
+    List<Post> findAllByModerationStatusAndIsActiveAndLikesCount(ModerationStatusesEnum status, Byte isActive, Pageable pageable);
+
     List<Post> findAllByTitleContainingOrTextContainingAndTimeBeforeAndIsActiveAndModerationStatus(
+            String title,
+            String text,
+            LocalDateTime time,
+            Byte isActive,
+            ModerationStatusesEnum status,
+            Pageable pageable
+    );
+
+    Integer countAllByTitleContainingOrTextContainingAndTimeBeforeAndIsActiveAndModerationStatus(
             String title,
             String text,
             LocalDateTime time,
@@ -33,37 +59,67 @@ public interface PostsRepo extends CrudRepository<Post, Integer> {
             "WHERE date(time) = :date " +
             "AND is_active = 1 " +
             "AND moderation_status = 'ACCEPTED' ", nativeQuery = true)
-    List<Post> findAllByTime_DateAndIsActiveAndModerationStatus(@Param("date") String date);
+    List<Post> findAllByTime_DateAndIsActiveAndModerationStatus(@Param("date") String date, Pageable pageable);
+
+    @Query(value =
+            "select count(*) from posts " +
+                    "where date(time) = :date " +
+                    "and is_active = 1 " +
+                    "and moderation_status = 'ACCEPTED'", nativeQuery = true)
+    Integer countByTime(@Param("date") String date);
 
     Optional<Post> findByIdAndIsActiveAndModerationStatus(Integer id, Byte isActive, ModerationStatusesEnum status);
 
     List<Post> findAllByModerationStatusAndModeratorAndIsActive(
             ModerationStatusesEnum status,
             User moderator,
+            Byte isActive,
+            Pageable pageable
+    );
+
+    Integer countAllByModerationStatusAndModeratorAndIsActive(
+            ModerationStatusesEnum status,
+            User moderator,
             Byte isActive
     );
 
-    List<Post> findAllByModerationStatusAndIsActive(ModerationStatusesEnum status, Byte isActive);
+    List<Post> findAllByModerationStatusAndIsActive(ModerationStatusesEnum status, Byte isActive, Pageable pageable);
+    Integer countAllByModerationStatusAndIsActive(ModerationStatusesEnum status, Byte isActive);
 
-    List<Post> findAllByModerationStatusAndIsActiveAndAuthorId(ModerationStatusesEnum status, Byte isActive, Integer authorId);
+    List<Post> findAllByModerationStatusAndIsActiveAndAuthorId(
+            ModerationStatusesEnum status,
+            Byte isActive,
+            Integer authorId,
+            Pageable pageable
+    );
 
-    List<Post> findAllByIsActiveAndAuthorId(Byte isActive, Integer authorId);
+    Integer countAllByModerationStatusAndIsActiveAndAuthorId(
+            ModerationStatusesEnum status,
+            Byte isActive,
+            Integer authorId
+    );
+
+    List<Post> findAllByIsActiveAndAuthorId(Byte isActive, Integer authorId, Pageable pageable);
+    Integer countAllByIsActiveAndAuthorId(Byte isActive, Integer authorId);
 
     @Query(
             "select p from Post p " +
             "join Post2Tag p2t on p2t.postId = p.id " +
             "join Tag t on t.id = p2t.tagId " +
             "where t.name = :tagName")
-    List<Post> findAllByTag(String tagName);
+    List<Post> findAllByTag(String tagName, Pageable pageable);
 
-    @Query(value =
-            "select count(*) from posts " +
-            "where date(time) = :date " +
-            "and is_active = 1 " +
-            "and moderation_status = 'ACCEPTED'", nativeQuery = true)
-    Integer countByTime(@Param("date") String date);
+    @Query("select count(p) from Post p " +
+            "join Post2Tag p2t on p2t.postId = p.id " +
+            "join Tag t on t.id = p2t.tagId " +
+            "where t.name = :tagName")
+    Integer countAllByTag(String tagName);
 
-    Integer countByIsActiveAndModerationStatus(Byte isActive, ModerationStatusesEnum status);
+    Integer countByIsActiveAndModerationStatusAndTimeBefore(
+            Byte isActive, ModerationStatusesEnum status, LocalDateTime time
+    );
+
+
 
     Integer countPostsByAuthorId(Integer authorId);
 

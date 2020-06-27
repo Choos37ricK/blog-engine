@@ -1,6 +1,7 @@
 package project.services;
 
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import project.dto.CalendarDto;
@@ -23,7 +24,7 @@ public class PostService {
 
     private final PostsRepo postsRepo;
 
-    public Integer addPost(PostPublishDto postPublishDto, User author) {
+    public Integer addPost(PostPublishDto postPublishDto, User author, Boolean premoderation) {
 
         LocalDateTime publishDate = LocalDateTime.parse(postPublishDto.getTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
 
@@ -41,10 +42,14 @@ public class PostService {
                 0
         );
 
+        if (!premoderation) {
+            post.setModerationStatus(ModerationStatusesEnum.ACCEPTED);
+        }
+
         return postsRepo.save(post).getId();
     }
 
-    public Integer editPost(PostPublishDto postPublishDto, User editor, Integer postId) {
+    public Integer editPost(PostPublishDto postPublishDto, User editor, Integer postId, Boolean premoderation) {
         Post postFromDb = findPostById(postId);
 
         LocalDateTime publishDate = LocalDateTime.parse(postPublishDto.getTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
@@ -60,6 +65,10 @@ public class PostService {
 
         if (editor.getIsModerator() == 0) {
             postFromDb.setModerationStatus(ModerationStatusesEnum.NEW);
+        }
+
+        if (!premoderation) {
+            postFromDb.setModerationStatus(ModerationStatusesEnum.ACCEPTED);
         }
 
         return postsRepo.save(postFromDb).getId();
@@ -93,29 +102,42 @@ public class PostService {
         return new CalendarDto(yearsWithPublications, postMap);
     }
 
-    public List<Post> getPostsBySort(String mode) {
+    public List<Post> getPostsBySort(String mode, Integer offset, Integer limit) {
         List<Post> postList = null;
+
         switch (mode) {
             case "recent":
                 postList = postsRepo.findAllByTimeBeforeAndIsActiveAndModerationStatus(
                         LocalDateTime.now(),
                         (byte) 1,
                         ModerationStatusesEnum.ACCEPTED,
-                        Sort.by(Sort.Direction.DESC, "time")
+                        PageRequest.of(
+                                offset / limit,
+                                limit,
+                                Sort.by(Sort.Direction.DESC, "time")
+                        )
                 );
                 break;
             case "popular":
-
+                postList = postsRepo.findAllByModerationStatusAndIsActiveAndCommentsCount(
+                        ModerationStatusesEnum.ACCEPTED, (byte) 1, PageRequest.of(offset / limit, limit)
+                );
+                break;
             case "best":
-
-                postList = postsRepo.findAllByModerationStatusAndIsActive(ModerationStatusesEnum.ACCEPTED, (byte) 1);
+                postList = postsRepo.findAllByModerationStatusAndIsActiveAndLikesCount(
+                        ModerationStatusesEnum.ACCEPTED, (byte) 1, PageRequest.of(offset / limit, limit)
+                );
                 break;
             case "early":
                 postList = postsRepo.findAllByTimeBeforeAndIsActiveAndModerationStatus(
                         LocalDateTime.now(),
                         (byte) 1,
                         ModerationStatusesEnum.ACCEPTED,
-                        Sort.by(Sort.Direction.ASC, "time")
+                        PageRequest.of(
+                                offset / limit,
+                                limit,
+                                Sort.by(Sort.Direction.ASC, "time")
+                        )
                 );
                 break;
         }
@@ -127,19 +149,14 @@ public class PostService {
 
         Post post;
         if (user != null) {
-            if (user.getIsModerator() == 1) {
-                post = postsRepo.findByIdAndIsActive(postId, (byte) 1).orElse(null);
-            }
-            else {
-                post = postsRepo.findById(postId).orElse(null);
+            post = postsRepo.findById(postId).orElse(null);
 
-                if (post != null) {
-                    if (!(post.getAuthor().equals(user) &&
-                            post.getIsActive() == (byte) 1 &&
-                            post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED
-                    )) {
-                        post = null;
-                    }
+            if (post != null) {
+                if (!(post.getAuthor().getId() == user.getId() ||
+                        post.getIsActive() == (byte) 1 ||
+                        post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED)
+                ) {
+                    post = null;
                 }
             }
         } else {
@@ -148,32 +165,50 @@ public class PostService {
                     .orElse(null);
         }
 
+        if (post != null) {
+            post.setViewCount(post.getViewCount() + 1);
+            savePost(post);
+        }
         return post;
     }
 
-    public List<Post> getPostsByDate(String date) {
-        return postsRepo.findAllByTime_DateAndIsActiveAndModerationStatus(date);
+    public List<Post> getPostsByDate(String date, Integer offset, Integer limit) {
+        return postsRepo.findAllByTime_DateAndIsActiveAndModerationStatus(
+                date, PageRequest.of(offset / limit, limit));
     }
 
-    public List<Post> findPostsByTag(String tag) {
-        return postsRepo.findAllByTag(tag);
+    public Integer countPostsByDate(String date) {
+        return postsRepo.countByTime(date);
     }
 
-    public List<Post> getPostsByNeedModeration(String status, User moderator) {
+    public List<Post> findPostsByTag(String tag, Integer offset, Integer limit) {
+        return postsRepo.findAllByTag(tag, PageRequest.of(offset / limit, limit));
+    }
+
+    public Integer countPostsByTag(String tag) {
+        return postsRepo.countAllByTag(tag);
+    }
+
+    public List<Post> getPostsByNeedModeration(String status, User moderator, Integer offset, Integer limit) {
         List<Post> postList = null;
 
         switch (status) {
             case "new":
-                postList = postsRepo.findAllByModerationStatusAndIsActive(ModerationStatusesEnum.NEW, (byte) 1);
+                postList = postsRepo.findAllByModerationStatusAndIsActive(
+                        ModerationStatusesEnum.NEW, (byte) 1,
+                        PageRequest.of(offset / limit, limit)
+                );
                 break;
             case "declined":
                 postList = postsRepo.findAllByModerationStatusAndModeratorAndIsActive(
-                        ModerationStatusesEnum.DECLINED, moderator, (byte) 1
+                        ModerationStatusesEnum.DECLINED, moderator, (byte) 1,
+                        PageRequest.of(offset / limit, limit)
                 );
                 break;
             case "accepted":
                 postList = postsRepo.findAllByModerationStatusAndModeratorAndIsActive(
-                        ModerationStatusesEnum.ACCEPTED, moderator, (byte) 1
+                        ModerationStatusesEnum.ACCEPTED, moderator, (byte) 1,
+                        PageRequest.of(offset / limit, limit)
                 );
                 break;
         }
@@ -181,8 +216,41 @@ public class PostService {
         return postList;
     }
 
-    public List<Post> findPostsByQuery(String query) {
+    public Integer countPostsByNeedModeration(String status, User moderator) {
+        Integer count = 0;
+
+        switch (status) {
+            case "new":
+                count = postsRepo.countAllByModerationStatusAndIsActive(ModerationStatusesEnum.NEW, (byte) 1);
+                break;
+            case "declined":
+                count = postsRepo.countAllByModerationStatusAndModeratorAndIsActive(
+                        ModerationStatusesEnum.DECLINED, moderator, (byte) 1
+                );
+                break;
+            case "accepted":
+                count = postsRepo.countAllByModerationStatusAndModeratorAndIsActive(
+                        ModerationStatusesEnum.ACCEPTED, moderator, (byte) 1
+                );
+                break;
+        }
+
+        return count;
+    }
+
+    public List<Post> findPostsByQuery(String query, Integer offset, Integer limit) {
         return postsRepo.findAllByTitleContainingOrTextContainingAndTimeBeforeAndIsActiveAndModerationStatus(
+                query,
+                query,
+                LocalDateTime.now(),
+                (byte) 1,
+                ModerationStatusesEnum.ACCEPTED,
+                PageRequest.of(offset / limit, limit)
+        );
+    }
+
+    public Integer countPostsByQuery(String query) {
+        return postsRepo.countAllByTitleContainingOrTextContainingAndTimeBeforeAndIsActiveAndModerationStatus(
                 query,
                 query,
                 LocalDateTime.now(),
@@ -191,37 +259,71 @@ public class PostService {
         );
     }
 
-    public List<Post> getMyPostsByStatus(Integer userId, String status) {
+    public List<Post> getMyPostsByStatus(Integer userId, String status, Integer offset, Integer limit) {
         List<Post> postList = null;
         switch (status) {
             case "inactive":
-                postList = postsRepo.findAllByIsActiveAndAuthorId((byte) 0, userId);
+                postList = postsRepo.findAllByIsActiveAndAuthorId(
+                        (byte) 0, userId, PageRequest.of(offset / limit, limit)
+                );
                 break;
             case "pending":
-                postList = postsRepo.findAllByModerationStatusAndIsActiveAndAuthorId(ModerationStatusesEnum.NEW, (byte) 1, userId);
+                postList = postsRepo.findAllByModerationStatusAndIsActiveAndAuthorId(
+                        ModerationStatusesEnum.NEW, (byte) 1, userId, PageRequest.of(offset / limit, limit)
+                );
                 break;
             case "declined":
-                postList = postsRepo.findAllByModerationStatusAndIsActiveAndAuthorId(ModerationStatusesEnum.DECLINED, (byte) 1, userId);
+                postList = postsRepo.findAllByModerationStatusAndIsActiveAndAuthorId(
+                        ModerationStatusesEnum.DECLINED, (byte) 1, userId, PageRequest.of(offset / limit, limit)
+                );
                 break;
             case "published":
-                postList = postsRepo.findAllByModerationStatusAndIsActiveAndAuthorId(ModerationStatusesEnum.ACCEPTED, (byte) 1, userId);
+                postList = postsRepo.findAllByModerationStatusAndIsActiveAndAuthorId(
+                        ModerationStatusesEnum.ACCEPTED, (byte) 1, userId, PageRequest.of(offset / limit, limit)
+                );
                 break;
         }
 
         return postList;
     }
 
-    private Integer countPostsByDate(String date) {
-        return postsRepo.countByTime(date);
+    public Integer countMyPostsByStatus(Integer userId, String status) {
+        Integer count = 0;
+        switch (status) {
+            case "inactive":
+                count = postsRepo.countAllByIsActiveAndAuthorId((byte) 0, userId);
+                break;
+            case "pending":
+                count = postsRepo.countAllByModerationStatusAndIsActiveAndAuthorId(
+                        ModerationStatusesEnum.NEW, (byte) 1, userId
+                );
+                break;
+            case "declined":
+                count = postsRepo.countAllByModerationStatusAndIsActiveAndAuthorId(
+                        ModerationStatusesEnum.DECLINED, (byte) 1, userId
+                );
+                break;
+            case "published":
+                count = postsRepo.countAllByModerationStatusAndIsActiveAndAuthorId(
+                        ModerationStatusesEnum.ACCEPTED, (byte) 1, userId
+                );
+                break;
+        }
+
+        return count;
     }
 
     public Integer countPostsNeedModeration() {
-        return postsRepo.countByIsActiveAndModerationStatus((byte) 1, ModerationStatusesEnum.NEW);
+        return postsRepo.countByIsActiveAndModerationStatusAndTimeBefore(
+                (byte) 1, ModerationStatusesEnum.NEW, LocalDateTime.now());
     }
 
     public Integer countPosts() {
-        return postsRepo.countByIsActiveAndModerationStatus((byte) 1, ModerationStatusesEnum.ACCEPTED);
+        return postsRepo.countByIsActiveAndModerationStatusAndTimeBefore(
+                (byte) 1, ModerationStatusesEnum.ACCEPTED, LocalDateTime.now());
     }
+
+
 
     public Integer countPostsByAuthorId(Integer authorId) {
         return postsRepo.countPostsByAuthorId(authorId);

@@ -2,12 +2,12 @@ package project.services;
 
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
+import project.dto.TagDto;
 import project.models.Tag;
 import project.repositories.TagsRepo;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @AllArgsConstructor
@@ -42,5 +42,25 @@ public class TagService {
         }
 
         return tagIds;
+    }
+
+    public List<TagDto> setWeights(List<TagDto> tagDtoList) {
+        Float biggestWeight = tagDtoList.get(0).getWeight();
+        tagDtoList.get(0).setWeight(1f);
+
+        float multiplicationCoefficient = 1/biggestWeight;
+        tagDtoList.forEach(tagDto -> {
+            Float tagWeight = tagDto.getWeight();
+            if (tagWeight < 0.3 && tagWeight != 0) {
+                tagWeight *= multiplicationCoefficient;
+
+                if (tagWeight < 0.3) {
+                    tagWeight = 0.3f;
+                }
+                tagDto.setWeight(tagWeight);
+            }
+        });
+
+        return tagDtoList;
     }
 }

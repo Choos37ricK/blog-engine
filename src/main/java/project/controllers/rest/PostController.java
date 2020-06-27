@@ -1,19 +1,20 @@
 package project.controllers.rest;
 
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.RequestContextHolder;
 import project.controllers.exceptions.BadRequestException;
 import project.controllers.exceptions.UnauthorizedException;
 import project.dto.*;
+import project.models.GlobalSetting;
 import project.models.Post;
 import project.models.PostComment;
 import project.models.User;
+import project.models.enums.GlobalSettingsEnum;
 import project.services.*;
 
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,6 +40,8 @@ public class PostController {
 
     private final Post2TagService post2TagService;
 
+    private final GlobalSettingsService globalSettingsService;
+
     @Value("${title.min.length}")
     private Integer titleMinLength;
 
@@ -54,17 +57,11 @@ public class PostController {
             @RequestParam Integer limit,
             @RequestParam String mode
     ) {
-        List<Post> postList = postService.getPostsBySort(mode);
+        List<Post> postList = postService.getPostsBySort(mode, offset, limit);
 
-        List<PostDto> dtos = getPostDtoList(postList, offset, limit);
+        List<PostDto> dtos = getPostDtoList(postList);
 
-        if (mode.equals("popular")) {
-            dtos.sort(Comparator.comparing(PostDto::getCommentCount).reversed());
-        } else if (mode.equals("best")) {
-            dtos.sort(Comparator.comparing(PostDto::getLikeCount).reversed());
-        }
-
-        return ResponseEntity.ok(new PostListDto(postList.size(), dtos));
+        return ResponseEntity.ok(new PostListDto(postService.countPosts(), dtos));
     }
 
     @GetMapping("/search")
@@ -73,20 +70,18 @@ public class PostController {
             @RequestParam Integer limit,
             @RequestParam String query
     ) {
-        List<Post> postList = postService.findPostsByQuery(query);
+        List<Post> postList = postService.findPostsByQuery(query, offset, limit);
 
-        List<PostDto> dtos = getPostDtoList(postList, offset, limit);
+        List<PostDto> dtos = getPostDtoList(postList);
 
-        return ResponseEntity.ok(new PostListDto(postList.size(), dtos));
+        return ResponseEntity.ok(new PostListDto(postService.countPostsByQuery(query), dtos));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getPostById(@PathVariable Integer id) {
-        Post post;
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        User user = userService.findUserById(authService.getUserIdBySession(sessionId));
+        User user = userService.findUserById(authService.getUserIdBySession());
 
-        post = postService.getPostByIdAndModerationStatus(id, user);
+        Post post = postService.getPostByIdAndModerationStatus(id, user);
 
         if (post == null) {
             throw new BadRequestException("Данный пост вам не доступен");
@@ -101,11 +96,11 @@ public class PostController {
             @RequestParam Integer limit,
             @RequestParam String date
     ) {
-        List<Post> postList = postService.getPostsByDate(date);
+        List<Post> postList = postService.getPostsByDate(date, offset, limit);
 
-        List<PostDto> dtos = getPostDtoList(postList, offset, limit);
+        List<PostDto> dtos = getPostDtoList(postList);
 
-        return ResponseEntity.ok(new PostListDto(postList.size(), dtos));
+        return ResponseEntity.ok(new PostListDto(postService.countPostsByDate(date), dtos));
     }
 
     @GetMapping("/byTag")
@@ -114,29 +109,34 @@ public class PostController {
             @RequestParam Integer limit,
             @RequestParam String tag
     ) {
-        List<Post> postList = postService.findPostsByTag(tag);
+        List<Post> postList = postService.findPostsByTag(tag, offset, limit);
 
-        List<PostDto> dtos = getPostDtoList(postList, offset, limit);
+        List<PostDto> dtos = getPostDtoList(postList);
 
-        return ResponseEntity.ok(new PostListDto(postList.size(), dtos));
+        return ResponseEntity.ok(new PostListDto(postService.countPostsByTag(tag), dtos));
     }
 
     @GetMapping("/moderation")
     public ResponseEntity<?> getPostsByNeedModeration(@RequestParam Integer offset,
-                                                                @RequestParam Integer limit,
-                                                                @RequestParam String status
+                                                      @RequestParam Integer limit,
+                                                      @RequestParam String status
     ) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
         List<Post> postList = postService.getPostsByNeedModeration(
-                status, userService.findUserById(authService.getUserIdBySession(sessionId)));
+                status,
+                userService.findUserById(authService.getUserIdBySession()),
+                offset, limit);
 
-        List<PostDto> dtos = getPostDtoList(postList, offset, limit);
+        List<PostDto> dtos = getPostDtoList(postList);
 
-        return ResponseEntity.ok(new PostListDto(postList.size(), dtos));
+        return ResponseEntity.ok(new PostListDto(postService.countPostsByNeedModeration(
+                status,
+                userService.findUserById(authService.getUserIdBySession())),
+                dtos
+        ));
     }
 
     @GetMapping("/my")
@@ -144,16 +144,19 @@ public class PostController {
                                         @RequestParam Integer limit,
                                         @RequestParam String status
     ) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
-        List<Post> postList = postService.getMyPostsByStatus(authService.getUserIdBySession(sessionId), status);
+        List<Post> postList = postService.getMyPostsByStatus(authService.getUserIdBySession(), status, offset, limit);
 
-        List<PostDto> dtos = getPostDtoList(postList, offset, limit);
+        List<PostDto> dtos = getPostDtoList(postList);
 
-        return ResponseEntity.ok(new PostListDto(postList.size(), dtos));
+        return ResponseEntity.ok(new PostListDto(
+                postService.countMyPostsByStatus(authService.getUserIdBySession(), status),
+                dtos
+        ));
     }
 
     @PostMapping
@@ -168,31 +171,31 @@ public class PostController {
 
     @PostMapping("/like")
     public ResponseEntity<?> like(@RequestBody VotePostIdDto votePostIdDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
         ResultTrueFalseDto isLiked = postVoteService.votePost(
-                votePostIdDto.getPostId(), authService.getUserIdBySession(sessionId), 1);
+                votePostIdDto.getPostId(), authService.getUserIdBySession(), 1);
         return isLiked.getResult() ? ResponseEntity.ok(isLiked) : ResponseEntity.badRequest().body(isLiked);
     }
 
     @PostMapping("/dislike")
     public ResponseEntity<?> dislike(@RequestBody VotePostIdDto votePostIdDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
         ResultTrueFalseDto isDisliked = postVoteService.votePost(
-                votePostIdDto.getPostId(), authService.getUserIdBySession(sessionId), -1);
+                votePostIdDto.getPostId(), authService.getUserIdBySession(), -1);
         return isDisliked.getResult() ? ResponseEntity.ok(isDisliked) : ResponseEntity.badRequest().body(isDisliked);
     }
 
     private ResponseEntity<?> checkOnErrors(PostPublishDto postPublishDto, Integer postId, String type) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
@@ -217,19 +220,31 @@ public class PostController {
             return ResponseEntity.badRequest().body(new ErrorsDto(false, errors));
         }
 
-        return savePostAndTags(sessionId, postPublishDto, postId, type);
+        return savePostAndTags(postPublishDto, postId, type);
     }
 
-    private ResponseEntity<?> savePostAndTags(String sessionId, PostPublishDto postPublishDto, Integer id, String type) {
-        User author = userService.findUserById(authService.getUserIdBySession(sessionId));
+    @SneakyThrows
+    private ResponseEntity<?> savePostAndTags(PostPublishDto postPublishDto, Integer id, String type) {
+        User author = userService.findUserById(authService.getUserIdBySession());
+
+        GlobalSetting globalSetting = globalSettingsService.getGlobalSettingByCode(GlobalSettingsEnum.MULTIUSER_MODE);
+
+        if (globalSetting.getValue().equals("NO") && author.getIsModerator() == 0) {
+            throw new BadRequestException("На данный момент публикация постов запрещена!");
+        }
+
+        globalSetting = globalSettingsService.getGlobalSettingByCode(GlobalSettingsEnum.POST_PREMODERATION);
+
+        boolean premoderation = true;
+        if (globalSetting.getValue().equals("NO")) {
+            premoderation = false;
+        }
 
         Integer postId = type.equals("add") ?
-                postService.addPost(postPublishDto, author)
-                : postService.editPost(postPublishDto, author, id);
+                postService.addPost(postPublishDto, author, premoderation)
+                : postService.editPost(postPublishDto, author, id, premoderation);
 
-        String[] tags = postPublishDto.getTags();
-
-        List<Integer> tagIds = tagService.saveTags(tags);
+        List<Integer> tagIds = tagService.saveTags(postPublishDto.getTags());
 
         post2TagService.savePost2Tag(postId, tagIds);
 
@@ -250,7 +265,9 @@ public class PostController {
                 post.getTime(),
                 authorDto,
                 post.getTitle(),
-                post.getText().substring(0, announceLength),
+                post.getText()
+                        .replaceAll("<(\"[^\"]*\"|'[^']*'|[^'\">])*>", "")
+                        .substring(0, announceLength),
                 likeCount,
                 dislikeCount,
                 commentCount,
@@ -258,11 +275,8 @@ public class PostController {
         );
     }
 
-    private List<PostDto> getPostDtoList(List<Post> postList, Integer offset, Integer limit) {
-        int subMaxIndex = offset + limit;
-        int totalPostCount = postList.size();
+    private List<PostDto> getPostDtoList(List<Post> postList) {
         return postList
-                .subList(offset, Math.min(subMaxIndex, totalPostCount))
                 .stream()
                 .map(this::getPostDto)
                 .collect(toList());

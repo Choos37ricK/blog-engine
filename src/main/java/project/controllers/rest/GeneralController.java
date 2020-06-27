@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.multipart.MultipartFile;
 import project.controllers.exceptions.BadRequestException;
 import project.controllers.exceptions.UnauthorizedException;
@@ -70,22 +69,16 @@ public class GeneralController {
     public ResponseEntity<?> getTags(@RequestParam(required = false) String query) {
         List<Tag> tagList = query != null ? tagService.findByStartsWith(query) : tagService.findAllTags();
 
-        Integer tagListSize = tagList.size();
+        if (tagList.size() == 0) {
+            return ResponseEntity.ok(null);
+        }
+
         List<TagDto> tagDtoList = tagList.stream()
                 .map(this::getTagDto)
                 .sorted(Comparator.comparing(TagDto::getWeight).reversed())
                 .collect(Collectors.toList());
 
-        Float biggestWeight = tagDtoList.get(0).getWeight();
-        tagDtoList.get(0).setWeight(1f);
-
-        tagDtoList.forEach(tagDto -> {
-            Float tagWeight = tagDto.getWeight();
-            if (tagWeight < 0.5) {
-                tagWeight *= (1/biggestWeight);
-                tagDto.setWeight(tagWeight);
-            }
-        });
+        tagDtoList = tagService.setWeights(tagDtoList);
 
         return ResponseEntity.ok(new TagListDto(tagDtoList));
     }
@@ -103,8 +96,8 @@ public class GeneralController {
     @PostMapping("moderation")
     @ResponseStatus(HttpStatus.OK)
     public void moderation(@RequestBody ModerationPostDto moderationPostDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
@@ -116,7 +109,7 @@ public class GeneralController {
         } else if (decision.equals("decline")) {
             moderatePost.setModerationStatus(ModerationStatusesEnum.DECLINED);
         }
-        User moderator = userService.findUserById(authService.getUserIdBySession(sessionId));
+        User moderator = userService.findUserById(authService.getUserIdBySession());
         moderatePost.setModerator(moderator);
 
         postService.savePost(moderatePost);
@@ -125,18 +118,13 @@ public class GeneralController {
     @GetMapping("calendar")
     public ResponseEntity<?> calendar(@RequestParam(required = false) Integer year) {
 
-
-//        if (year == null) {
-//            year = LocalDate.now().getYear();
-//        }
-
         return ResponseEntity.ok(postService.getCalendarDto(year));
     }
 
     @PostMapping("comment")
     public ResponseEntity<?> addComment(@RequestBody AddCommentDto addCommentDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
@@ -144,70 +132,21 @@ public class GeneralController {
     }
 
     @SneakyThrows
-    @PostMapping(value = "profile/my", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> editProfileWithPhoto(@RequestParam(value = "photo", required = false) MultipartFile photo,
-                                                  @ModelAttribute MyProfileDto myProfileDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
-            throw new UnauthorizedException();
-        }
-
-        User exist = userService.findUserById(authService.getUserIdBySession(sessionId));
-
-        ErrorsDto errorsDto = checkOnErrorsProfile(myProfileDto, exist, photo);
-        if (errorsDto.getErrors().size() > 0) {
-            return ResponseEntity.badRequest().body(errorsDto);
-        }
-
-        if (photo != null) {
-
-            String type = photo.getContentType().split("/")[1];
-            String randomName = RandomStringUtils.randomAlphanumeric(10);
-            String dir1 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
-            String dir2 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
-            String dir3 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
-            String dstPath = String.format("%s%s/%s/%s/", location, dir1, dir2, dir3);
-            File uploadFolder = new File(dstPath);
-
-            if (!uploadFolder.exists()) {
-                uploadFolder.mkdirs();
-            }
-            File dstFile = new File(uploadFolder, randomName + "." + type);
-            saveImage(50, photo, dstFile, type);
-
-            String userPhoto = exist.getPhoto();
-
-            exist.setPhoto(String.format("/%s%s.%s", dstPath, randomName, type));
-        }
-
-        exist.setName(myProfileDto.getName());
-        exist.setEmail(myProfileDto.getEmail());
-
-        if (myProfileDto.getPassword() != null) {
-            exist.setPassword(myProfileDto.getPassword());
-        }
-
-        userService.saveUser(exist);
-
-        return ResponseEntity.ok(new ResultTrueFalseDto(true));
-    }
-
-    @SneakyThrows
     @PostMapping("profile/my")
     public ResponseEntity<?> editProfile(@RequestBody MyProfileDto myProfileDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
-        User exist = userService.findUserById(authService.getUserIdBySession(sessionId));
+        User exist = userService.findUserById(authService.getUserIdBySession());
 
         ErrorsDto errorsDto = checkOnErrorsProfile(myProfileDto, exist, null);
         if (errorsDto.getErrors().size() > 0) {
             return ResponseEntity.badRequest().body(errorsDto);
         }
 
-        if (myProfileDto.getRemovePhoto() != null && myProfileDto.getRemovePhoto() == 1) { //разобраться с путями
+        if (myProfileDto.getRemovePhoto() != null && myProfileDto.getRemovePhoto() == 1) {
             String userPhoto = exist.getPhoto();
 
             if (userPhoto != null) {
@@ -228,14 +167,7 @@ public class GeneralController {
         return ResponseEntity.ok(new ResultTrueFalseDto(true));
     }
 
-    @SneakyThrows
-    @PostMapping("image")
-    public ResponseEntity<?> upload(@RequestPart("image") MultipartFile image) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
-            throw new UnauthorizedException();
-        }
-
+    private String prepareAndSaveImage(MultipartFile image) {
         String type = image.getContentType().split("/")[1];
         String randomName = RandomStringUtils.randomAlphanumeric(10);
         String dir1 = RandomStringUtils.randomAlphabetic(2).toLowerCase();
@@ -248,9 +180,60 @@ public class GeneralController {
             uploadFolder.mkdirs();
         }
         File dstFile = new File(uploadFolder, randomName + "." + type);
-        saveImage(200, image, dstFile, type);
+        saveImage(50, image, dstFile, type);
 
-        return ResponseEntity.ok(String.format("/%s%s.%s", dstPath, randomName, type));
+        return String.format("/%s%s.%s", dstPath, randomName, type);
+    }
+
+    @SneakyThrows
+    @PostMapping(value = "profile/my", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> editProfileWithPhoto(@RequestParam(value = "photo") MultipartFile photo,
+                                                  @ModelAttribute MyProfileDto myProfileDto) {
+
+        if (!authService.checkAuthorization()) {
+            throw new UnauthorizedException();
+        }
+
+        User exist = userService.findUserById(authService.getUserIdBySession());
+
+        ErrorsDto errorsDto = checkOnErrorsProfile(myProfileDto, exist, photo);
+        if (errorsDto.getErrors().size() > 0) {
+            return ResponseEntity.badRequest().body(errorsDto);
+        }
+
+        if (photo != null) {
+            String imagePath = prepareAndSaveImage(photo);
+            String oldUserPhoto = exist.getPhoto();
+
+            if (oldUserPhoto != null) {
+                new File(oldUserPhoto.replaceFirst("/", "")).delete();
+            }
+            exist.setPhoto(imagePath);
+        }
+
+        exist.setName(myProfileDto.getName());
+        exist.setEmail(myProfileDto.getEmail());
+
+        if (myProfileDto.getPassword() != null) {
+            exist.setPassword(myProfileDto.getPassword());
+        }
+
+        userService.saveUser(exist);
+
+        return ResponseEntity.ok(new ResultTrueFalseDto(true));
+    }
+
+    @SneakyThrows
+    @PostMapping("image")
+    public ResponseEntity<?> upload(@RequestPart("image") MultipartFile image) {
+
+        if (!authService.checkAuthorization()) {
+            throw new UnauthorizedException();
+        }
+
+        String imagePath = prepareAndSaveImage(image);
+
+        return ResponseEntity.ok(imagePath);
     }
 
     @SneakyThrows
@@ -291,8 +274,8 @@ public class GeneralController {
     }
 
     private ResponseEntity<?> checkOnErrorsComment(AddCommentDto addCommentDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (!authService.checkAuthorization(sessionId)) {
+
+        if (!authService.checkAuthorization()) {
             throw new UnauthorizedException();
         }
 
@@ -320,7 +303,7 @@ public class GeneralController {
 
         return ResponseEntity.ok(
                 new AddedCommentIdDto(
-                        postCommentService.saveComment(addCommentDto, authService.getUserIdBySession(sessionId))
+                        postCommentService.saveComment(addCommentDto, authService.getUserIdBySession())
                 )
         );
     }
@@ -336,10 +319,11 @@ public class GeneralController {
     /**
      * Метод сохранения и/или возврата настроек (убирает дублирование кода)
      */
+    @SneakyThrows
     private ResponseEntity<?> makeSettings(GlobalSettingsDto globalSettingsDto) {
-        String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        if (authService.checkAuthorization(sessionId)) {
-            User userFromDB = userService.findUserById(authService.getUserIdBySession(sessionId));
+
+        if (authService.checkAuthorization()) {
+            User userFromDB = userService.findUserById(authService.getUserIdBySession());
             if (userFromDB.getIsModerator() == 1) {
                 List<GlobalSetting> settings = globalSettingsService.findAll();
 
@@ -358,6 +342,8 @@ public class GeneralController {
                 }
 
                 return ResponseEntity.ok(globalSettingsDto);
+            } else if (globalSettingsDto != null) {
+                throw new BadRequestException("У вас нет прав для совершения данного действия");
             }
         }
         return ResponseEntity.ok(new ResultTrueFalseDto(false));

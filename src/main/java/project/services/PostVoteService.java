@@ -21,10 +21,12 @@ public class PostVoteService {
             return new ResultTrueFalseDto(false);
         }
 
-        exist = postsVotesRepo.findByPostIdAndUserIdAndValue(postId, userId, value == 1 ? -1 : 1);
-        exist.ifPresent(postsVotesRepo::delete);
+        synchronized (exist) {
+            exist = postsVotesRepo.findByPostIdAndUserIdAndValue(postId, userId, value == 1 ? -1 : 1);
+            exist.ifPresent(postsVotesRepo::delete);
 
-        postsVotesRepo.save(new PostVote(userId, postId, new Date(), value));
+            postsVotesRepo.save(new PostVote(userId, postId, new Date(), value));
+        }
 
         return new ResultTrueFalseDto(true);
     }
