@@ -53,6 +53,15 @@ public class GeneralController {
     @Value("${name.max.length}")
     private Integer nameMaxLength;
 
+    @Value("${password.min.length}")
+    private Integer passwordMinLength;
+
+    @Value("${text.min.length}")
+    private Integer textMinLength;
+
+    @Value("${max.photo.size}")
+    private Integer maxPhotoSize;
+
     @GetMapping("init")
     public ResponseEntity<InitInfoDto> initInfo() {
         InitInfoDto dto = new InitInfoDto(
@@ -258,7 +267,7 @@ public class GeneralController {
             }
         }
 
-        if (photo != null && photo.getSize() > 5242880) {
+        if (photo != null && photo.getSize() > maxPhotoSize) {
             errors.put("photo", "Фото слишком большое, нужно не более 5 Мб");
         }
 
@@ -266,7 +275,7 @@ public class GeneralController {
             errors.put("name", "Имя указано неверно или имеет недопустимую длину (1-30)");
         }
 
-        if (myProfileDto.getPassword() != null && myProfileDto.getPassword().length() < 6) {
+        if (myProfileDto.getPassword() != null && myProfileDto.getPassword().length() < passwordMinLength) {
             errors.put("password", "Пароль короче 6-ти символов");
         }
 
@@ -293,7 +302,7 @@ public class GeneralController {
 
         if (text.isEmpty()) {
             errors.put("text", "Текст комментария не задан");
-        } else if (text.length() < 10) {
+        } else if (text.length() < textMinLength) {
             errors.put("text", "Текст комментария слишком короткий");
         }
 

@@ -30,8 +30,7 @@ public class TagService {
     public List<Integer> saveTags(String[] tagNames) {
         List<Integer> tagIds = new ArrayList<>();
 
-        for (int i = 0; i < tagNames.length; i++) {
-            String tagName = tagNames[i];
+        for (String tagName : tagNames) {
             Tag exist = tagsRepo.findByName(tagName).orElse(null);
 
             if (exist == null) {

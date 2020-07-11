@@ -6,7 +6,6 @@ import project.models.enums.ModerationStatusesEnum;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
-import java.util.Date;
 
 @Data
 @NoArgsConstructor

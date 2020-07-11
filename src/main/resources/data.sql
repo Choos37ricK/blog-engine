@@ -915,7 +915,3 @@ insert into tags (id, name) values (5, 'Skillbox');
 # insert into post2tag (id, post_id, tag_id) values (80, 45, 16);
 # insert into post2tag (id, post_id, tag_id) values (81, 29, 10);
 # insert into post2tag (id, post_id, tag_id) values (82, 36, 12);
-
-insert into global_settings values (1, 'MULTIUSER_MODE', 'Многопользовательский режим', 'YES');
-insert into global_settings values (2, 'POST_PREMODERATION', 'Премодерация постов', 'YES');
-insert into global_settings values (3, 'STATISTICS_IS_PUBLIC', 'Показывать всем статистику блога', 'YES');

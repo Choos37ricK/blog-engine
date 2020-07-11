@@ -151,7 +151,7 @@ public class PostService {
         if (user != null) {
             post = postsRepo.findById(postId).orElse(null);
 
-            if (post != null) {
+            if (user.getIsModerator() == 0 && post != null) {
                 if (!(post.getAuthor().getId() == user.getId() ||
                         post.getIsActive() == (byte) 1 ||
                         post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED)

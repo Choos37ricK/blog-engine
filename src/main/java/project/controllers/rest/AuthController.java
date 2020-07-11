@@ -2,7 +2,6 @@ package project.controllers.rest;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +10,7 @@ import project.models.CaptchaCode;
 import project.models.User;
 import project.services.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -31,12 +31,6 @@ public class AuthController {
     private final EmailService emailService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    @Value("${response.host}")
-    private String host;
-
-    @Value("${server.port}")
-    private String port;
 
     @PostMapping("login")
     public ResponseEntity<?> login(@RequestBody LoginDto loginDto) {
@@ -70,7 +64,7 @@ public class AuthController {
     }
 
     @PostMapping("register")
-    public ResponseEntity<?> register(@RequestBody RegisterDto registerDto) {
+    public ResponseEntity<?> register(@RequestBody RegisterDto registerDto, HttpServletRequest request) {
         CaptchaCode captcha = captchaCodeService.findCaptchaByCodeAndSecretCode(
                 registerDto.getCaptcha(), registerDto.getCaptchaSecret());
 
@@ -93,7 +87,7 @@ public class AuthController {
                 registerDto.getEmail(),
                 passwordEncoder.encode(registerDto.getPassword()),
                 null,
-                String.format("http://%s:%s/%s", host, port, "/src/main/resources/uploads/default-1.png")
+                String.format("http://%s:%s/%s", request.getServerName(), request.getServerPort(), "/src/main/resources/uploads/default-1.png")
         );
         userService.saveUser(newUser);
 

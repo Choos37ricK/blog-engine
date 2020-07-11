@@ -1,6 +1,7 @@
 package project.repositories;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PostsRepo extends CrudRepository<Post, Integer> {
+
+    @Modifying
+    @Query("UPDATE Post p SET p.viewCount = :viewCount WHERE p.id = :postId")
+    void updateViewCount(Integer postId, Integer viewCount);
+
     List<Post> findAllByTimeBeforeAndIsActiveAndModerationStatus(
             LocalDateTime time,
             Byte isActive,

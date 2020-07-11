@@ -1,6 +1,7 @@
 package project.models;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import project.models.enums.GlobalSettingsEnum;
 
 import javax.persistence.*;
@@ -8,6 +9,7 @@ import javax.persistence.*;
 @Data
 @Entity
 @Table(name = "global_settings")
+@NoArgsConstructor
 public class GlobalSetting {
 
     @Id
@@ -23,4 +25,10 @@ public class GlobalSetting {
 
     @Column(nullable = false)
     private String value;
+
+    public GlobalSetting(GlobalSettingsEnum code, String name, String value) {
+        this.code = code;
+        this.name = name;
+        this.value = value;
+    }
 }
