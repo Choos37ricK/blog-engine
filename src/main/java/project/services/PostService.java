@@ -166,8 +166,9 @@ public class PostService {
         }
 
         if (post != null) {
-            post.setViewCount(post.getViewCount() + 1);
-            savePost(post);
+            if (user != null && post.getAuthor().getId() != user.getId()) {
+                postsRepo.updateViewCount(post.getId(), post.getViewCount() + 1);
+            }
         }
         return post;
     }

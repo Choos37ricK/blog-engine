@@ -6,7 +6,7 @@ import project.dto.ResultTrueFalseDto;
 import project.models.PostVote;
 import project.repositories.PostsVotesRepo;
 
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.Optional;
 
 @Service
@@ -16,16 +16,11 @@ public class PostVoteService {
     private final PostsVotesRepo postsVotesRepo;
 
     public ResultTrueFalseDto votePost(Integer postId, Integer userId, Integer value) {
-        Optional<PostVote> exist = postsVotesRepo.findByPostIdAndUserIdAndValue(postId, userId, value);
+        Optional<PostVote> exist = postsVotesRepo.findByPostIdAndUserId(postId, userId);
         if (exist.isPresent()) {
-            return new ResultTrueFalseDto(false);
-        }
-
-        synchronized (exist) {
-            exist = postsVotesRepo.findByPostIdAndUserIdAndValue(postId, userId, value == 1 ? -1 : 1);
-            exist.ifPresent(postsVotesRepo::delete);
-
-            postsVotesRepo.save(new PostVote(userId, postId, new Date(), value));
+            postsVotesRepo.updatePostVoteByPostIdAndUserId(postId, userId, value);
+        } else {
+            postsVotesRepo.save(new PostVote(userId, postId, LocalDate.now(), value));
         }
 
         return new ResultTrueFalseDto(true);
