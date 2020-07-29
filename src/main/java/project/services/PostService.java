@@ -152,7 +152,7 @@ public class PostService {
             post = postsRepo.findById(postId).orElse(null);
 
             if (user.getIsModerator() == 0 && post != null) {
-                if (!(post.getAuthor().getId() == user.getId() ||
+                if (!(post.getAuthor().getId().equals(user.getId()) ||
                         post.getIsActive() == (byte) 1 ||
                         post.getModerationStatus() == ModerationStatusesEnum.ACCEPTED)
                 ) {
@@ -166,7 +166,7 @@ public class PostService {
         }
 
         if (post != null) {
-            if (user != null && post.getAuthor().getId() != user.getId()) {
+            if (!(user == null && post.getAuthor().getId().equals(user.getId()))) {
                 postsRepo.updateViewCount(post.getId(), post.getViewCount() + 1);
             }
         }
