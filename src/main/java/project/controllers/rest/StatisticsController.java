@@ -15,7 +15,8 @@ import project.services.PostService;
 import project.services.PostVoteService;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 @RestController
 @RequestMapping("/api/statistics/")
@@ -43,14 +44,13 @@ public class StatisticsController {
         Integer myTotalDislikeCount = postService.countTotalVoteCountByAuhtorIdAndValue(authorId, -1);
         Integer myTotalViewCount = postService.countViewCountByAuthorId(authorId);
         LocalDateTime myFirstPublicationDate = postService.findByAuhtorIdFirstPublicationDate(authorId);
-        String myFirstPublication = myFirstPublicationDate != null ?
-                myFirstPublicationDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy hh:mm")) : "";
+
         return ResponseEntity.ok(new StatisticsDto(
                 myPostsTotalCount,
                 myTotalLikeCount,
                 myTotalDislikeCount,
                 myTotalViewCount != null ? myTotalViewCount : 0,
-                myFirstPublication
+                myFirstPublicationDate == null ? 0 : myFirstPublicationDate.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneOffset.UTC).toEpochSecond()
         ));
     }
 
@@ -68,14 +68,13 @@ public class StatisticsController {
         Integer totalDislikesCount = postVoteService.countVotesByValue(-1);
         Integer totalViewsCount = postService.countViewCount();
         LocalDateTime firstPublicationDate = postService.findFirstPublicationDate();
-        String firstPublication = firstPublicationDate != null ?
-                        firstPublicationDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy hh:mm")) : "";
+
         return ResponseEntity.ok(new StatisticsDto(
                 postsTotalCount,
                 totalLikesCount,
                 totalDislikesCount,
                 totalViewsCount != null ? totalViewsCount : 0,
-                firstPublication
+                firstPublicationDate == null ? 0 : firstPublicationDate.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneOffset.UTC).toEpochSecond()
         ));
     }
 }

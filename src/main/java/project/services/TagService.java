@@ -45,6 +45,10 @@ public class TagService {
 
     public List<TagDto> setWeights(List<TagDto> tagDtoList) {
         Float biggestWeight = tagDtoList.get(0).getWeight();
+        if (biggestWeight <= 0.0) {
+            return null;
+        }
+
         tagDtoList.get(0).setWeight(1f);
 
         float multiplicationCoefficient = 1/biggestWeight;

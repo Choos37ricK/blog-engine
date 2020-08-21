@@ -13,7 +13,7 @@ public interface CaptchaCodesRepo extends CrudRepository<CaptchaCode, Integer> {
     @Modifying
     @Query(value =
             "delete from captcha_codes " +
-            "where time_to_sec(timediff(now(), time)) > 3600", nativeQuery = true)
+            "where  time_to_sec(timediff(now(), time)) > 3600", nativeQuery = true)
     void deleteOld();
 
     Optional<CaptchaCode> findByCodeAndSecretCode(String Code, String secretCode);

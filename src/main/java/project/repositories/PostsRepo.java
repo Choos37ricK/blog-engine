@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 import project.models.Post;
 import project.models.User;
 import project.models.enums.ModerationStatusesEnum;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 public interface PostsRepo extends CrudRepository<Post, Integer> {
 
+    @Transactional
     @Modifying
     @Query("UPDATE Post p SET p.viewCount = :viewCount WHERE p.id = :postId")
     void updateViewCount(Integer postId, Integer viewCount);

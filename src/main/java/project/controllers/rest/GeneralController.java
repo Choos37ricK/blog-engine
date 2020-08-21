@@ -300,10 +300,8 @@ public class GeneralController {
 
         HashMap<String, String> errors = new HashMap<>();
 
-        if (text.isEmpty()) {
-            errors.put("text", "Текст комментария не задан");
-        } else if (text.length() < textMinLength) {
-            errors.put("text", "Текст комментария слишком короткий");
+        if (text.isEmpty() || text.length() < textMinLength) {
+            errors.put("text", "Текст комментария не задан или слишком короткий");
         }
 
         if (errors.size() > 0) {
@@ -331,30 +329,27 @@ public class GeneralController {
     @SneakyThrows
     private ResponseEntity<?> makeSettings(GlobalSettingsDto globalSettingsDto) {
 
-        if (authService.checkAuthorization()) {
-            User userFromDB = userService.findUserById(authService.getUserIdBySession());
-            if (userFromDB.getIsModerator() == 1) {
-                List<GlobalSetting> settings = globalSettingsService.findAll();
-
-                if (globalSettingsDto != null) {
+        List<GlobalSetting> settings = globalSettingsService.findAll();
+        if (globalSettingsDto != null) {
+            if (authService.checkAuthorization()) {
+                User userFromDB = userService.findUserById(authService.getUserIdBySession());
+                if (userFromDB.getIsModerator() == 1) {
                     settings.get(0).setValue(globalSettingsDto.getMultiuserMode() ? "YES" : "NO");
                     settings.get(1).setValue(globalSettingsDto.getPostPremoderation() ? "YES" : "NO");
                     settings.get(2).setValue(globalSettingsDto.getStatisticsIsPublic() ? "YES" : "NO");
 
                     globalSettingsService.saveSettings(settings);
-                } else {
-                    globalSettingsDto = new GlobalSettingsDto(
-                            settings.get(0).getValue().equals("YES"),
-                            settings.get(1).getValue().equals("YES"),
-                            settings.get(2).getValue().equals("YES")
-                    );
+                    return ResponseEntity.ok(globalSettingsDto);
                 }
-
-                return ResponseEntity.ok(globalSettingsDto);
-            } else if (globalSettingsDto != null) {
-                throw new BadRequestException("У вас нет прав для совершения данного действия");
             }
+            throw new BadRequestException("У вас нет прав для совершения данного действия");
+        } else {
+            globalSettingsDto = new GlobalSettingsDto(
+                    settings.get(0).getValue().equals("YES"),
+                    settings.get(1).getValue().equals("YES"),
+                    settings.get(2).getValue().equals("YES")
+            );
+            return ResponseEntity.ok(globalSettingsDto);
         }
-        return ResponseEntity.ok(new ResultTrueFalseDto(false));
     }
 }

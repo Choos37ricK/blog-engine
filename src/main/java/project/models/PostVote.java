@@ -4,7 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
@@ -23,12 +23,12 @@ public class PostVote {
     private Integer postId;
 
     @Column(nullable = false)
-    private LocalDate time;
+    private LocalDateTime time;
 
     @Column(nullable = false)
     private Integer value;
 
-    public PostVote(Integer userId, Integer postId, LocalDate time, Integer value) {
+    public PostVote(Integer userId, Integer postId, LocalDateTime time, Integer value) {
         this.userId = userId;
         this.postId = postId;
         this.time = time;

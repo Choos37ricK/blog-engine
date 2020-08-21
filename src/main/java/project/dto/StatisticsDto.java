@@ -15,5 +15,5 @@ public class StatisticsDto {
 
     private Integer viewsCount;
 
-    private String firstPublication;
+    private Long firstPublication;
 }

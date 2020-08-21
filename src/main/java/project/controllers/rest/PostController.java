@@ -15,6 +15,8 @@ import project.models.User;
 import project.models.enums.GlobalSettingsEnum;
 import project.services.*;
 
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -262,7 +264,7 @@ public class PostController {
 
         return new PostDto(
                 postId,
-                post.getTime(),
+                post.getTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneOffset.UTC).toEpochSecond(),
                 authorDto,
                 post.getTitle(),
                 post.getText()
@@ -292,7 +294,7 @@ public class PostController {
 
         return new OnePostDto(
                 postDto.getId(),
-                postDto.getTime(),
+                postDto.getTimestamp(),
                 postDto.getUser(),
                 postDto.getTitle(),
                 postDto.getAnnounce(),
@@ -311,7 +313,7 @@ public class PostController {
 
         return new PostCommentDto(
                 comment.getId(),
-                comment.getTime(),
+                comment.getTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneOffset.UTC).toEpochSecond(),
                 comment.getText(),
                 new CommentUserDto(
                         commentUser.getId(),

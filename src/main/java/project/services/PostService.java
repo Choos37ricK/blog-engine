@@ -11,7 +11,9 @@ import project.models.User;
 import project.models.enums.ModerationStatusesEnum;
 import project.repositories.PostsRepo;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +28,10 @@ public class PostService {
 
     public Integer addPost(PostPublishDto postPublishDto, User author, Boolean premoderation) {
 
-        LocalDateTime publishDate = LocalDateTime.parse(postPublishDto.getTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        LocalDateTime publishDate = LocalDateTime.ofInstant(
+                Instant.ofEpochSecond(postPublishDto.getTimestamp()),
+                ZoneId.of("UTC")
+        );
 
         if (publishDate.isBefore(LocalDateTime.now())) {
             publishDate = LocalDateTime.now();
@@ -52,7 +57,10 @@ public class PostService {
     public Integer editPost(PostPublishDto postPublishDto, User editor, Integer postId, Boolean premoderation) {
         Post postFromDb = findPostById(postId);
 
-        LocalDateTime publishDate = LocalDateTime.parse(postPublishDto.getTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        LocalDateTime publishDate = LocalDateTime.ofInstant(
+                Instant.ofEpochSecond(postPublishDto.getTimestamp()),
+                ZoneId.of("UTC")
+        );
 
         if (publishDate.isBefore(LocalDateTime.now())) {
             publishDate = LocalDateTime.now();
@@ -93,8 +101,7 @@ public class PostService {
 
         Map<String, Integer> postMap = new TreeMap<>();
         postList.forEach(post -> {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String postDate = post.getTime().format(formatter);
+            String postDate = post.getTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             Integer postCount = countPostsByDate(postDate);
             postMap.put(postDate, postCount);
         });
@@ -166,8 +173,11 @@ public class PostService {
         }
 
         if (post != null) {
-            if (!(user == null && post.getAuthor().getId().equals(user.getId()))) {
-                postsRepo.updateViewCount(post.getId(), post.getViewCount() + 1);
+            if (user != null) {
+                if (post.getAuthor().getId().equals(user.getId())) {
+                    post.setViewCount(post.getViewCount() + 1);
+                    postsRepo.updateViewCount(post.getId(), post.getViewCount());
+                }
             }
         }
         return post;

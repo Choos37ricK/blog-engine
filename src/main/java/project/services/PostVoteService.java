@@ -6,7 +6,7 @@ import project.dto.ResultTrueFalseDto;
 import project.models.PostVote;
 import project.repositories.PostsVotesRepo;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -20,7 +20,7 @@ public class PostVoteService {
         if (exist.isPresent()) {
             postsVotesRepo.updatePostVoteByPostIdAndUserId(postId, userId, value);
         } else {
-            postsVotesRepo.save(new PostVote(userId, postId, LocalDate.now(), value));
+            postsVotesRepo.save(new PostVote(userId, postId, LocalDateTime.now(), value));
         }
 
         return new ResultTrueFalseDto(true);

@@ -7,7 +7,7 @@ import lombok.Data;
 @AllArgsConstructor
 public class PostPublishDto {
 
-    private String time;
+    private Long timestamp;
 
     private Byte active;
 
