@@ -26,4 +26,14 @@ public class Post2TagService {
             }
         });
     }
+
+    public void deletePost2Tag(Integer postId, List<Integer> tagIds) {
+        tagIds.forEach(tagId -> {
+            Post2Tag exist = post2TagRepo.findByPostIdAndTagId(postId, tagId).orElse(null);
+
+            if (exist != null) {
+                post2TagRepo.delete(exist);
+            }
+        });
+    }
 }

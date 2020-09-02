@@ -3,6 +3,8 @@ package project.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @AllArgsConstructor
 public class PostPublishDto {
@@ -15,5 +17,5 @@ public class PostPublishDto {
 
     private String text;
 
-    private String[] tags;
+    private List<String> tags;
 }

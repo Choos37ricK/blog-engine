@@ -23,14 +23,27 @@ public class TagService {
         return tagsRepo.findByNameStartingWith(query);
     }
 
+    public List<Integer> findIdsByNames(List<String> tagNames) {
+       List<Integer> tagIds = new ArrayList<>();
+       tagNames.forEach(tagName -> {
+            Tag exist = tagsRepo.findByName(tagName).orElse(null);
+
+            if (exist != null) {
+                tagIds.add(exist.getId());
+            }
+       });
+
+       return tagIds;
+    }
+
     public List<String> findAllByPostId(Integer postId) {
         return tagsRepo.findAllByPostId(postId);
     }
 
-    public List<Integer> saveTags(String[] tagNames) {
+    public List<Integer> saveTags(List<String> tagNamesNew, Integer postId) {
         List<Integer> tagIds = new ArrayList<>();
 
-        for (String tagName : tagNames) {
+        for (String tagName : tagNamesNew) {
             Tag exist = tagsRepo.findByName(tagName).orElse(null);
 
             if (exist == null) {

@@ -175,10 +175,11 @@ public class PostService {
         if (post != null) {
             if (user != null) {
                 if (post.getAuthor().getId().equals(user.getId())) {
-                    post.setViewCount(post.getViewCount() + 1);
-                    postsRepo.updateViewCount(post.getId(), post.getViewCount());
+                    return post;
                 }
             }
+            post.setViewCount(post.getViewCount() + 1);
+            postsRepo.updateViewCount(post.getId(), post.getViewCount());
         }
         return post;
     }

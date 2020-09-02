@@ -17,6 +17,7 @@ import project.services.*;
 
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -246,9 +247,22 @@ public class PostController {
                 postService.addPost(postPublishDto, author, premoderation)
                 : postService.editPost(postPublishDto, author, id, premoderation);
 
-        List<Integer> tagIds = tagService.saveTags(postPublishDto.getTags());
+        List<String> tagNamesNew = postPublishDto.getTags();
+        List<String> tagNamesOld = tagService.findAllByPostId(postId);
+        List<String> tagNamesDeleted = new ArrayList<>();
 
-        post2TagService.savePost2Tag(postId, tagIds);
+        tagNamesOld.forEach(tagNameOld -> {
+            if (!tagNamesNew.contains(tagNameOld)) {
+                tagNamesDeleted.add(tagNameOld);
+            }
+            tagNamesNew.remove(tagNameOld);
+        });
+
+        List<Integer> tagIdsToDelete = tagService.findIdsByNames(tagNamesDeleted);
+        List<Integer> tagIdsToSave = tagService.saveTags(tagNamesNew, postId);
+
+        post2TagService.deletePost2Tag(postId, tagIdsToDelete);
+        post2TagService.savePost2Tag(postId, tagIdsToSave);
 
         return ResponseEntity.ok(new ResultTrueFalseDto(true));
     }
